@@ -1,0 +1,6 @@
+﻿.done {
+    text-decoration: line-through;
+    background-image: linear-gradient(to bottom, #8d8 0%, #afa 100%);
+    border: 1px outset #8d8;
+    border-radius: 4px;
+}

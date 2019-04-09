@@ -1,0 +1,896 @@
+#!/bin/bash
+
+rt(){
+[ -z "`screen -ls | grep rtorrent`" ] && screen -fa -dmS rtorrent ~/rtorrent.sh || screen -drS rtorrent 
+df -h | grep mnt
+}
+
+lt(){
+local basedir=/home/vgoissa/rtorrent/watch/load/
+local fname="$basedir/$(date).torrent"
+while read -r l
+do
+fname="$basedir/$(date).torrent"
+[ -n "$l" ] && curl -k "$l" -o "$fname"
+echo $fname '['$(du -h "$fname")']'
+done
+}
+
+redo(){
+#sed -nre "s/.*title=$1;(.*)$/\1/p" ~/${2:-3}/test.log
+t=${1%.zip}
+t=${t##*/}
+if [ -z "$2" ]
+then
+	l=${PWD}
+else
+	l=~/${2}
+fi
+echo "[$t]@$l"
+grep -F "title=$t;" ${l}/test.log | sed -ne 's/^.*title=/title=/p' | rip --
+}
+
+um() {
+sudo umount ${1:-/mnt/sdb1/}
+}
+
+worker() {
+w=1
+ls /tmp/worker* | while read -r worker; do w=$((w+1)); done
+screen -dmS worker$w /home/vgoissa/worker.sh -- worker
+}
+
+scres() {
+screen -U ${1:+-r "$@"}
+}
+
+ww() {
+local bls=fail
+for l in `screen -ls "$1" | sed -ne '/worker.*(Detached)/ s/(Detached)//p'`; do scres "$l" ; unset bls; done
+[ "$bls" == "fail" ] && screen ${1:+-S "$1"} -U "$SHELL" --login
+}
+e3(){
+local err='err'
+[ "-a" == "$1" ] && shift && unset err
+sed -ne '/title.*'"$1"'/,/Failed.*'"$1"'/{;'${err:+/err/}'p; /title:/p;/Success/p;/Failed/p ;}'  ${2:-3}/test.log 
+}
+
+l3() {
+sed -ne 's/^\(.*title=.*;\).*$/\1/ p;/Failed/p; /Succ/p' ${1:-3}/test.log
+}
+
+p3() {
+ccd ~/fix
+if [ -f test.err ] 
+then
+p
+return $?
+fi
+
+for todo in ~/?/test.err
+do
+if [ -f "$todo" ]
+then
+file=$todo
+dir=${file%/test.err}
+mv $dir/*.zip ~/3/test.err . && cp test.err "test.err.`date`" && p
+fi
+break
+done
+}
+
+ss () {
+local a
+local b
+[ -z "$1" ] && a=$SHELL && b=--login
+screen -U $a $b "$@"
+#screen ${1:+-S "$1"} -U "$SHELL" --login
+}
+rr() {
+#sudo -i screen -URRS admin
+sudo -i screen -l -s /opt/bin/bash -AURRS admin /opt/bin/bash --login
+}
+kk () {
+[ -p /tmp/test ] && screen -rS listen && return 0
+screen -dmS listen ~/arbitrate.sh -- test && echo Listener daemon started && return 0
+}
+kkk () {
+[ -p /tmp/test ] || echo "not running" 
+[ -p /tmp/test ] && echo -- > /tmp/test && echo Sent stop to listener daemon
+}
+
+llk () {
+ls -hl /home/vgoissa/*/*${1}*
+}
+
+lk () {
+du -h /home/vgoissa/*/*${1}*
+}
+
+backup() {
+[ -f test.err ] && rm test.err
+[ -f test ] && cat test >> test.done && rm test
+}
+
+p () {
+pusage() {
+cat << PUSAGE
+	Usage : 	p
+		no params, test should not be empty
+		test.err contatins remediation cmds
+PUSAGE
+return 2
+}
+[ -f parse.sed ] && { pusage; return 2; }
+if [ ! -s test.err ]
+then
+vi test
+[ -s test ] || pusage || return $?
+process test rip "$@"
+fi
+if [ -s test.err ] 
+then
+vi test.err
+[ -s test.err ] && . test.err && backup
+else
+backup
+fi
+}
+pf () {
+usage() {
+cat <<USAGE; return 2
+	Usage : 	pf
+	No params, files to be in ff subdir. Processed are moved to dd subdir
+USAGE
+}
+[ -d "ff" ] || usage || return 2
+[ -d "dd" ] || mkdir dd
+ls ff/ | while read f
+do 
+	rip -f "ff/$f" && mv "ff/$f" "dd/$f"
+done
+}
+
+process () {
+usage(){
+cat <<USAGE; return 2
+	Usage: process <file> <command> [<params>]
+USAGE
+}
+[ -n "$1" ] && [ -n "$2" ] || usage || return 2
+file=$1
+cmd=$2
+shift 2
+cat "$file" | while read line
+do
+	"$cmd" "$line" "$@"
+done
+}
+
+ccd() {
+usage() { cat <<USAGE-CCD; return 2
+	Usage: ccd <dir>
+USAGE-CCD
+}
+[ -n "$1" ] || usage || return 2
+[ -d "$1" ] || mkdir "$1"
+cd "$1"
+}
+
+collect () {
+#local fn="${1:-${PWD##*/} `date`}.zip"
+#fn=${fn//[/(}
+#fn=${fn//]/)}
+zip -m -0 "${1:-${PWD##*/} `date`}.zip" * -x "test*" -x "data-test*" -x "*/" -x "*.zip" -x "*.rar" 2> /tmp/err.log || process /tmp/err.log log "from zip"
+}
+
+opera() { 
+curl --http1.1 -H "Accept: text/html, application/xml;q=0.9, application/xhtml+xml, image/png, image/webp, image/jpeg, image/gif, image/x-xbitmap, */*;q=0.1" -H "Accept-Language: en,ru-RU;q=0.9,ru;q=0.8"  -b test.jar -c test.jar -A 'Opera/9.80 (Windows NT 6.1; WOW64) Presto/2.12.388 Version/12.12' "$@"
+}
+
+vipergirls() {
+dummy "$@"
+true
+}
+
+dummy() {
+local newname=${1##*/}
+[ -n "$rename" ] && newname=$pp.${1##*.}
+echo to be $newname from $1
+shift
+[ -n "$1" ] && echo with $@
+}
+
+log() {
+echo `date`: "$@"
+echo `date`: "$@" >> test.log
+}
+
+scurl() {
+log scurl "$@"
+local url=$1
+[ -n "$url" ] || return 2
+shift 1
+local uu=${url##*/}
+local ext=${uu##*.}
+ext=${ext:-jpg}
+[ -n "$pp" ] && [ -z "$newname" ] && local newname=$pp.$ext
+[ -f "$newname" ] && log $newname exists @"$@" && return 2
+[ -n "$rename" ] && [ -n "$newname" ] && local opt="$newname"
+log opera "$url" -e "$@" ${opt:+-o} "${opt:--O}"
+opera "$url" -e "$@" ${opt:+-o} "${opt:--O}" || { log failed$? ${newname:+$newname @}"$@"; return 2;} 
+}
+
+imgsimple() {
+local regex=$1
+shift
+local h=`echo "$*"|sed -rne 's@.*(https?://[^/ ]*/).*@\1@p'`
+local hh=`echo "$*"|sed -nre 's@.*(https?://[^ ]*/).*@\1@p'`
+echo $h,$hh
+local url=`opera -L "$@"|sed -nre '\!(has been deleted|'"$regex"')! {
+:N
+s,^.*<img[^>]*src=["'"'"'](https?[^"'"'"']*)["'"'"'].*$,\1,i p 
+t E
+s,^.*<img[^>]*src=["'"'"']/([^"'"'"']*)["'"'"'].*$,'"$h"'\1,i p 
+t E
+s,^.*<img[^>]*src=["'"'"']([^/][^"'"'"']*)["'"'"'].*$,'"$hh"'\1,i p 
+t E
+s/.*has been deleted.*/deleted/p
+t E
+N
+b N
+:E
+q
+}'`
+[ "$url" == "deleted" ] && { log $1@$title has been deleted; echo "#$1@$title has been deleted" >> test.err; return 4;}
+[ -n "${url%%http*://*}" ] && url=${1%/*}/$url
+log url:$url
+[ -n "$url" ]   || { uu="$1"; shift; echo "title='$title'; ${rename:+pp=$pp;}${newname:+newname='$newname';} imgsimple '$regex' '$uu'" "$@" "${newname:+;unset newname}" >>test.err; return 2;}
+scurl "$url" "$@" -L || { uu="$1"; shift; echo "title='$title'; ${rename:+pp=$pp;}${newname:+newname='$newname';} imgsimple '$regex' '$uu'" "$@" "${newname:+;unset newname}" >>test.err; return 3;}
+[ -n "$pos" ] && [ -n "$cnt" ] && [ "$pos" -lt "$cnt" ] && echo -n "[u"
+return 0
+}
+
+imgsimple_old() {
+local regex=$1
+shift
+local h=`echo "$*"|sed -rne 's@.*(https?://[^/ ]*/).*@\1@p'`
+local hh=`echo "$*"|sed -nre 's@.*(https?://[^ ]*/).*@\1@p'`
+echo $h,$hh
+local url=`opera -L "$@"|sed -ne '\!\(has been deleted\|'"$regex"'\)! {
+:N
+s/^.*<img[^>]*src=["'"'"']\(https?[^"'"'"']*\)["'"'"'].*$/\1/i p 
+t E
+s,^.*<img[^>]*src=["'"'"']/\([^"'"'"']*\)["'"'"'].*$,'"$h"'\1,i p 
+t E
+s,^.*<img[^>]*src=["'"'"']\([^/][^"'"'"']*\)["'"'"'].*$,'"$hh"'\1,i p 
+t E
+s/.*has been deleted.*/deleted/p
+t E
+N
+b N
+:E
+q
+}'`
+echo u1$url
+[ "$url" == "deleted" ] && { log $1@$title has been deleted; echo "#$1@$title has been deleted" >> test.err; return 4;}
+[ -n "${url%%http*://*}" ] && url=${1%/*}/$url
+log url:$url
+[ -n "$url" ]   || { uu="$1"; shift; echo "title='$title'; ${rename:+pp=$pp;}${newname:+newname='$newname';} imgsimple '$regex' '$uu'" "$@" "${newname:+;unset newname}" >>test.err; return 2;}
+scurl "$url" "$@" -L || { uu="$1"; shift; echo "title='$title'; ${rename:+pp=$pp;}${newname:+newname='$newname';} imgsimple '$regex' '$uu'" "$@" "${newname:+;unset newname}" >>test.err; return 3;}
+[ -n "$pos" ] && [ -n "$cnt" ] && [ "$pos" -lt "$cnt" ] && echo -n "[u"
+return 0
+}
+
+imgspice () {
+#     <a href="#" onclick="javascript:ghisthendsx();"><img src="http://img30.imgspice.com/i/03442/qi05sofuxx7i.jpg" id="knjdycbs87nbd" onload="ghisthendsx()" style="cursor: url(/cursor.cur), default; padding: 2px;" ></a>
+#<div><a href="#" onclick="javascript:ghisthendsx();"><img src="http://img30.imgspice.com/i/03490/70dsfr9c62hg.jpg" id="knjdycbs87nbd" onload="ghisthendsx()" style="cursor: url(/cursor.cur), default; padding: 2px;" ></a></div>
+local rename="On"
+local newname=${1##*/}
+local pp=""
+newname=${newname%.htm*}
+imgsimple '<img.*cursor: url(/cursor.cur)' "$@"
+#"<[aA] [hH][rR][eE][fF]=.javascript:[a-zA-Z]*()" "$@"
+}
+
+imgtube () {
+imgform "<input" "<img [^<>]*id=.image" "$@" 
+}
+
+cuteimg () {
+imgform2 "<input" "<img [^<>]*class=.pic" "$@" -L
+}
+
+imgmaid () {
+imgform2 "<input" "<img [^<>]*class=.pic" "$@" -L
+}
+
+chronos () {
+imgform2 "<input" "<img [^<>]*class=.pic" "$@" -L
+}
+
+coreimg () {
+imgform2 "<input" "<img [^<>]*class=.pic" "$@" -L
+}
+
+pic_maniac () {
+imgform "<input" "<img [^<>]*class=.pic" "$@" -L
+}
+
+myimg () {
+imgform "<input" "<img [^<>]*class=.pic" "$@" -L
+}
+
+foxyimg () {
+imgform "<input" "<img [^<>]*class=.pic" "$@" -L
+}
+
+imgdragon () {
+imgform "<input" "<img [^<>]*class=.pic" "$@" -L
+}
+
+imgclick () {
+imgform "<input" "<img [^<>]*class=.pic" "$@" -L
+}
+
+acidimg () {
+imgform "<input" "<img [^<>]*class=.centred" "$@" -L
+}
+
+picz () {
+imgform "<input" "<img [^<>]*class=.centred" "$@" -L
+}
+
+imgease () {
+imgform "<input" "<img [^<>]*class=.centred" "$@" -L
+}
+
+rapidimg () {
+imgform "<input" "<img [^<>]*class=.centred" "$@" -L
+}
+
+fireimg () {
+imgform "<input" "<img [^<>]*class=.centred" "$@" -L
+}
+
+imgflash () {
+imgform "<input" "<img [^<>]*class=.centred" "$@" -L
+}
+
+fapat () {
+imgform "<input" "<img [^<>]*class=.centred" "$@" -L
+}
+
+imageon () {
+imgform "<input" "<img [^<>]*class=.centred" "$@" -L
+}
+
+img () {
+imgform "<input" "<img [^<>]*class=.centred" "$@" -L
+}
+
+imgmaster () {
+imgform "class=.cti-submit" "<img [^<>]*class=.centred" "$@"
+}
+
+pixroute () {
+#imgsimple "avascript:loodfic()" "$@"
+#local rename="On"
+#local newname=${1##*/}
+#local pp=""
+#newname=${newname%.html}
+#imgsimple "<A HREF=.javascript:.*<img " "$@"
+imgspice "$@"
+}
+
+imgbox () {
+imgsimple "<img .*id=\"img" "$@"
+}
+
+pixhost () {
+imgsimple "<img id=\"show_image" "$@"
+}
+
+imageporter () {
+imgsimple "<img .*onload=.[a-zA-Z]*()" "$@"
+}
+
+imgtrial () {
+imgform "<input" "<img [^<>]*class=.centred" "$@" -L
+}
+
+gogoimage () {
+imgsimple "<img [^<>]*class=.centred" "$@"
+}
+
+imageontime () {
+imgsimple "<img [^<>]*class=.centred" "$@"
+}
+
+imgsavvy () {
+imgform "<input" "<img [^<>]*class=.centred" "$@"
+}
+
+jovoimage() {
+imgform "<input" "<img [^<>]*class=.centred" "$@"
+}
+
+#imageteam() {
+#imgform "<input" "<img [^<>]*class=.centred" "$@"
+#}
+
+imgform2() {
+local regex1=$1
+local regex2=$2
+shift 2
+#echo -ne "\033[s"
+#local data=`curl -A 'Opera/9.80 (Windows NT 6.1; WOW64) Presto/2.12.388 Version/12.12' "$@" -o data-test; cat data-test | sed -ne "/$regex1/ s/.*name=['\"]\([^'\"]*\)['\"].*value=['\"]\([^'\"]*\)['\"].*/\1=\2/p"`
+local data=`opera "$@" -o data-test; sed -ne "/$regex1/ s/.*name=['\"]\([^'\"]*\)['\"].*value=['\"]\([^'\"]*\)['\"].*/\1=\2/p" data-test | sed -e ':br;s/ /+/g;N;s/\n/\&/;t br'`
+log data:$data
+#$.cookie('file_id', '1967310', { expires: 10 });
+local cookie='__test; lang=english; _ga=GA1.2.2030185706.1432850183; ppu_main=1; ppu_sub=1; popcashpu=1; popcashpuCap=1'
+cookie=`sed -ne "/cookie/ s/.*cookie('\([^']*\)' *, *'\([^']*\)'.*$/\1=\2; /g p" data-test | sed -e '1,${;:br;N;s/\n//;t br;}'|sed -e 's/; *$//'`"; $cookie"
+log cookie=$cookie
+sleep 1
+#opera -H "Accept-Encoding: gzip, deflate" ${cookie:+-b} "$cookie" --data "$data" -o data-test2.gz -D data-test3 -e "$1" "$@" 
+opera ${cookie:+-b} "$cookie" --data "$data" -o data-test2 -D data-test3 -e "$1" "$@" 
+#[ -s data-test2 ] || { echo 'no data'; return 2; }
+#gzip -dc data-test2 |
+local url=`sed -ne "\%$regex2% s@.*src=['\"]\([^'\"]*\)['\"].*@\1@p" data-test2`
+[ -z  "${url#*.gif}" ] && echo -n sed url2 && url=`sed -ne "\%$regex2% s@.*$regex2[^<>]*src=['\"]\([^'\"]*\)['\"].*@\1@p" data-test2` && echo "[done]"
+[ -n "$url" ] && echo alt1 && local alt=`sed -ne "\%$regex2% s@.*\(title\|alt\)=['\"]\([^'\"]*\)['\"].*@\2@p" data-test2` && echo "alt: $alt"
+[ -z "$url" ] && echo -n sed cookie2 && cookie2=`sed -ne "/cookie/ s/.*cookie('\([^']*\)' *, *'\([^']*\)'.*$/\1=\2; /g p" data-test2 | sed -e '1,${;:br;N;s/\n//;t br;}'`"$cookie" && echo "[done]"
+[ -z "$url" ] && log cookie2=$cookie2
+[ -z "$url" ] && local data2=`sed -ne '/<[Ff][oO][Rr][Mm]/,/<\/[Ff][oO][Rr][Mm]/ {p;/<\/[Ff][oO][Rr][Mm]>/q}' data-test2 | sed -ne "/$regex1/ s/.*name=['\"]\([^'\"]*\)['\"].*value=['\"]\([^'\"]*\)['\"].*/\1=\2/p" | sed -e ':br;s/ /+/g;N;s/\n/\&/;t br'`
+[ -z "$url" ] && log data2:$data2
+[ -z "$url" ] && opera ${cookie:+-b} "$cookie" --data "$data2" -o data-test4 -D data-test5 -e "$1" "$@" 
+[ -z "$url" ] && echo -n sed url3 && url=`sed -ne "\%$regex2% s@.*$regex2[^<>]*src=['\"]\([^'\"]*\)['\"].*@\1@p" -e "\%$regex2% s@.*src=['\"]\([^'\"]*\)['\"].*@\1@p" data-test4` && echo "[done]"
+[ -z "$newname" ] && [ -z "$alt" ] && local alt=`sed -ne "\%$regex2% s@.*\(title\|alt\)=['\"]\([^'\"]*\)['\"].*@\2@p" data-test4` 
+log url:$url ${alt:+alt:}$alt
+[ -n "$alt" ] && alt=${alt##*/}
+[ "$alt" != "${alt%.*}" ] && local newname=$alt && unset alt
+[ -n "$alt" ] && ext1=${url##*/} && ext=${ext1##*.} && ext=${ext#$ext1} && unset ext1 && ext=${ext:+.$ext}
+[ -n "$alt" ] && [ -n "$ext" ] && [ -z "${alt##*$ext}" ] && unset ext
+[ -n "$alt" ] && [ -f "${alt}${ext}" ] && unset alt
+[ -n "$alt" ] && local newname=${alt}${ext}
+#.${url##*.}
+[ -z "$url" ] && { log "no url found at $1"; echo "#no url found at $1">>test.err; return 4;}
+[ -n "$url" ] && scurl "$url" "$@" ${cookie:+-b} "$cookie" || { url="$1"; shift; echo title='"'$title'";' "${rename:+pp=$pp;}${newname:+newname='$newname';}" imgform2 "'$regex1' '$regex2' '$url'" "$@" "${newname:+;unset newname}">>test.err; return 3;}
+[ -n "$pos" ] && [ -n "$cnt" ] && [ "$pos" -lt "$cnt" ] && echo -ne "[done]\033[u"
+return 0
+}
+
+imgform() {
+[ -z "$2" ] && log no URL supplied for $0 && return 0
+local regex1=$1
+local regex2=$2
+shift 2
+#echo -ne "\033[s"
+#local data=`curl -A 'Opera/9.80 (Windows NT 6.1; WOW64) Presto/2.12.388 Version/12.12' "$@" -L -D data-test1 -o data-test; cat data-test | sed -ne "/$regex1/ s/.*name=['\"]\([^'\"]*\)['\"].*value=['\"]\([^'\"]*\)['\"].*/\1=\2/p"`
+#local data=`opera "$@" -o data-test -L -D data-test1; sed -ne "/$regex1/ s/.*name=['\"]\([^'\"]*\)['\"].*value=['\"]\([^'\"]*\)['\"].*/\1=\2/p" data-test | sed -e ':br;s/ /+/g;N;s/\n/\&/;t br'`
+local data=`opera "$@" -o data-test -L -D data-test1; sed -ne "/<[fF]orm/,/<\/[fF]orm/ {;/$regex1/ s/.*name=['\"]\([^'\"]*\)['\"].*value=['\"]\([^'\"]*\)['\"].*/\1=\2/p;/<\/[fF]orm/ q;}" data-test | sed -e ':br;s/ /+/g;N;s/\n/\&/;t br'`
+local loc=`sed -ne '/Location:/ s@Location: \([ -~]*\).*$@\1@p' data-test1`
+#'"${1%/*}"'/
+[ -n "$loc" ] && [ "http" != "${loc:0:4}" ] && loc="${1%/*}/$loc"
+local ref=${loc:-$1}
+local orig="$1"
+shift
+log data:$data ${loc:-loc:$loc} ref:$ref
+#$.cookie('file_id', '1967310', { expires: 10 });
+local cookie='__test; lang=english; _ga=GA1.2.2030185706.1432850183; ppu_main=1; ppu_sub=1; popcashpu=1; popcashpuCap=1'
+cookie=`sed -ne "/cookie/ s/.*cookie('\([^']*\)' *, *'\([^']*\)'.*$/\1=\2; /g p" data-test | sed -e '1,${;:br;N;s/\n//;t br;}'|sed -e 's/; *$//'`"; $cookie"
+log cookie=$cookie
+local url=`sed -ne "\%$regex2% {;s@.*src=['\"]\([^'\"]*\)['\"].*@\1@p; q}" data-test`
+[ -z  "${url#*.gif}" ] && url=`sed -ne "\%$regex2% {;s@.*$regex2[^<>]*src=['\"]\([^'\"]*\)['\"].*@\1@p; q}" data-test`
+[ -z "$newname" ] && local alt=`sed -ne "\%$regex2% {;s@.*alt=['\"]\([^'\"]*\)['\"].*@\1@p; q}" data-test` 
+if [ -z "$url" ] ; then
+ sleep 1
+ #opera -H "Accept-Encoding: gzip, deflate" ${cookie:+-b} "$cookie" --data "$data" -o data-test2.gz -D data-test3 -e "$ref" "$@" 
+ opera ${cookie:+-b} "$cookie" --data "$data" -o data-test2 -D data-test3 -e "$ref" "$ref" "$@" 
+ #[ -s data-test2 ] || { echo 'no data'; return 2; }
+ #gzip -dc data-test2 |
+ url=`sed -ne "\%$regex2% {;s@.*src=['\"]\([^'\"]*\)['\"].*@\1@p; q}" data-test2`
+ [ -z  "${url#*.gif}" ] && url=`sed -ne "/src=/ s@.*$regex2[^<>]*src=['\"]\([^'\"]*\)['\"].*@\1@p" data-test2`
+ [ -z "$newname" ] && local alt=`sed -ne "\%$regex2% {;s@.*alt=['\"]\([^'\"]*\)['\"].*@\1@p; q}" data-test2` 
+fi
+[ -n "$alt" ] && alt=${alt##*/}
+[ "$alt" == "image" ] && unset alt
+log url:$url ${alt:+alt:}$alt
+
+[ -n "$alt" ] && ext1=${url##*/} && ext=${ext1##*.} && ext=${ext#$ext1} && unset ext1 && ext=${ext:+.$ext}
+[ -n "$alt" ] && [ -n "$ext" ] && [ -z "${alt##*$ext}" ] && unset ext
+[ -n "$alt" ] && [ -f "${alt}${ext}" ] && unset alt
+[ -n "$alt" ] && local newname=${alt}${ext}
+[ -z "$url" ] && { log "no url found at $orig"; echo "#no url found at $orig">>test.err; return 4;}
+[ -n "$url" ] && scurl "$url" "$ref" "$@" ${cookie:+-b} "$cookie" || { uu="$1"; shift; echo "title='$title'; ${rename:+pp=$pp;}${newname:+newname='$newname';} imgform '$regex1' '$regex2' '$orig' '$uu'" "$@" "${newname:+;unset newname}">>test.err; return 3;}
+[ -n "$pos" ] && [ -n "$cnt" ] && [ "$pos" -lt "$cnt" ] && echo -ne "[done][u"
+return 0
+}
+
+imgdino() { 
+#local url=`curl $@|sed -ne '/cursor_lupa/ s/.*src="\([^ ]*\)".*/\1/p'`
+#[ -n "$url" ] || return 2
+#scurl $url "$@"
+imgsimple '=.cursor_lupa' "$@"
+}
+
+imgtiger() { 
+imgsimple '=.cursor_lupa' "$@"
+} 
+
+imgchili() { 
+#local url=`curl $1|sed -ne '/<img id="show_image"/ {' -e 'N; s/.*src="//; s/".*//p' -e '}'`
+#[ -n "$url" ] || return 2
+#scurl $url "$@"
+imgsimple '<img [^<>]*id=.show_image.' "$@"
+}
+
+imgbabes() {
+imgsimple '<img [^<>]*id=.this_image.' "$@"
+}
+
+#sed -ne '/="show_image"/ s/.*src="\([^ ]*\)".*/\1/p'`; curl -e $1 -O $url; }
+
+imgonion() {
+#local data=`curl -A 'Opera/9.80 (Windows NT 6.1; WOW64) Presto/2.12.388 Version/12.12'  $1 -o data-test; cat data-test | sed -ne "/<input/ s/.*name='\([^']*\)'.*value='\([^']*\)'.*/\1=\2/p"`
+#echo data:$data
+#sleep 1
+#local url=`curl -A 'Opera/9.80 (Windows NT 6.1; WOW64) Presto/2.12.388 Version/12.12' -e $1 $1 --data-urlencode "$data" -o data-test2; cat data-test2 | sed -ne "\%<img class='centred% s@.*src='\([^']*\)'.*@\1@p"`
+#echo url:$url
+##opera $url -e $1 -O -L 
+#scurl $url "$@"
+imgform '<input' "<img [^<>]*class=.centred" "$@"
+}
+
+imgget() {
+imgsimple "<img [^<>]*class=.centred" "$@"
+}
+
+photolot() {
+imgsimple "<img [^<>]*class=.centred" "$@"
+}
+
+imgor() {
+imgsimple "<img [^<>]*class=.centred" "$@"
+}
+
+imgs() {
+imgsimple "<img [^<>]*class=.centred" "$@"
+}
+
+imgspot() {
+imgform "<input" "<img [^<>]*class=.centred" "$@"
+}
+
+imageteam() {
+imgsimple "<img [^<>]*class=.centred" "$@"
+}
+
+imgfap() {
+imgsimple "<img [^<>]*class=.centred" "$@"
+}
+
+imagedecode() {
+imgsimple "<img [^<>]*class=.centred" "$@"
+}
+
+damimage() {
+imgsimple "<img [^<>]*class=.centred" "$@"
+}
+
+imgstudio() {
+imgsimple "<img [^<>]*class=.centred" "$@"
+}
+
+imgsen() {
+imgform "<input" "<img [^<>]*class=.centred" "$@" -L
+}
+
+imggoo() {
+imgform "<input" "<img [^<>]*class=.centred" "$@"
+}
+
+imgnext () {
+imgform "<input" "<img [^<>]*class=.centred" "$@"
+}
+
+imagepicsa () {
+imgform "<input" "<img [^<>]*class=.centred" "$@"
+}
+
+hosturimage () {
+imgform "<input" "<img [^<>]*class=.centred" "$@"
+}
+
+imgcandy () {
+local rename="On"
+local newname=${1#*_}
+local pp=""
+[ "${newname:0:4}" == "http" ] && newname=${newname##*/}
+newname=${newname%.html}
+imgform "<input" "<img [^<>]*class=.centred" "$@" -L
+}
+
+imgbb () {
+local rename="On"
+local newname=${1#*_}
+local pp=""
+[ "${newname:0:4}" == "http" ] && newname=${newname##*/}
+newname=${newname%.html}
+imgform "<input" "<img [^<>]*class=.centred" "$@"
+}
+
+imagevenue () {
+local rename="On"
+local newname=${1##*image=}
+local pp=""
+newname=${newname%.html}
+imgsimple 'onLoad=.scaleImg()' "$@"
+}
+
+turboimagehost () {
+local rename="On"
+local newname=${1##*/}
+local pp=""
+newname=${newname%.html}
+imgsimple 'onLoad=.scaleImg()' "$@"
+}
+
+imagetwist () {
+#local url=`curl $1|sed -ne '/onLoad="scaleImg(this)/ s/.*src="\([^ ]*\)".*/\1/p'`
+#scurl $url "$@"
+##opera -e $1 -O $url
+local rename="On"
+local newname=${1##*/}
+local pp=""
+newname=${newname%.html}
+imgsimple 'class=.pic' "$@"
+#imgsimple 'onLoad=.scaleImg(this)' "$@"
+}
+
+madimage () {
+imgsimple 'class=.centred' "$@"
+}
+
+imgflare () {
+imgsimple 'onload=.adjustImage' "$@"
+}
+
+imgpaying () {
+local rename="On"
+local newname=${1##*/}
+local pp=""
+newname=${newname%.html}
+imgsimple 'onLoad=.scaleImg(this)' "$@"
+}
+
+imgtrex () {
+local rename="On"
+local newname=${1##*/}
+local pp=""
+newname=${newname%.html}
+[ -f "/home/vgoissa/skiptrex" ]  && { echo "title='$title'; ${rename:+pp=$pp;}${newname:+newname='$newname';} imgsimple 'onLoad=.scaleImg(this)'" "$@" "${newname:+;unset newname}" >>test.err; return 2;}
+imgsimple 'onLoad=.scaleImg(this)' "$@"
+}
+
+imgheat () {
+imgsimple 'onLoad=.scaleImg(this)' "$@"
+}
+
+xlocker () {
+imgsimple 'onLoad=.scaleImg(this)' "$@"
+}
+
+imgserve () {
+#local url=`opera $1|sed -ne '/onload="scale(this)/ s/.*src="\([^ ]*\)".*/\1/p'`
+#log url: $url
+#scurl $url "$@"
+#opera -e $1 -O $url
+imgsimple "<img [^<>]*class=.centred" "$@"
+}
+
+imageeer () {
+imgsimple "<img [^<>]*class=.centred" "$@"
+}
+
+imgproof () {
+imgsimple "<img [^<>]*class=.centred" "$@"
+}
+
+imgearn () {
+imgsimple '<img [^<>]*scaleImgR\?(this)' "$@"
+
+}
+
+imagebam () {
+#local url=`curl $1|sed -ne '/onclick="scale(this)/ s/.*src="\([^ ]*\)".*/\1/p'`
+##[ -n "$rename" ] && local r="$rename"
+local rename=""
+#scurl $url "$@"
+##[ -n "$r" ] && rename="$r"
+##opera -e $1 -O $url
+imgsimple 'class=.image' "$@"
+}
+adetect () {
+local cmd=`expr "$1" : "[^a-zA-Z0-9]*https?://\([a-z0-9A-Z]*\)\.[a-zA-Z]*/" ||\
+        expr "$1" : "[^a-zA-Z0-9]*https?://ww*\.\([a-z0-9A-Z]*\)\.[a-zA-Z]*/"`
+[ -z "$cmd" ] && log autodetection failed for $1 && cmd=echo
+[ -n "$cmd" ] && $cmd "$@"
+}
+
+rip() {
+[ -n "$1" ] || { cat << USAGE ; return 2
+
+	Usage: rip <URL> [script [extra params]]
+	
+	env
+		nonstop: no pauses
+		rename: do renumbering
+		resume: resume session
+USAGE
+}
+[ -n "$resume" ] || mold
+local pos=0
+local cnt=0
+local len=0 
+local pp
+#pp=image
+local u="$1"
+local failed=0
+local success=0
+shift
+if [ "$u" == "-f" ] ; then
+local urls=`sed -nf /home/vgoissa/parse.sed "$@"`
+shift
+elif [ "$u" = "--" ]; then
+read -r urls
+else
+local urls=`opera "$u" 2> /dev/null | sed -nf /home/vgoissa/parse.sed `
+[ "${urls##*;}1" == "1" ] && urls=`opera "$u" 2> /dev/null | sed -nf /home/vgoissa/reparse.sed`
+fi
+log urls: $urls
+local ttl=${urls%%;*}
+[ "${ttl%%=*}" == "title" ] && local title=${ttl##*=} && local stitle=`expr "$title" : "\([-a-zA-Z0-9_ \.]*[a-zA-Z0-9]\)[^a-z0-9A-Z]*"` && stitle=${stitle:-${title//[\]()\{\}\[]/_}}${stitle:+ } || title="${PWD##*/} `date`"
+log title:  $title
+log stitle: $stitle
+[ -n "$urls" ] && echo -e "#$(date): $title@$u\n$urls" >> test.started 
+urls=${urls##*;}
+#[ -z "$1" ] && local cmd=`expr "$urls" : "[^a-zA-Z0-9]*https?://\([a-z0-9A-Z]*\)\.[a-zA-Z]*/" ||\
+#	expr "$urls" : "[^a-zA-Z0-9]*https?://ww*\.\([a-z0-9A-Z]*\)\.[a-zA-Z]*/"` ||\
+	local cmd=${1}
+shift
+for url in $urls
+do 
+[ -n "$url" ] && [ -z "${url%%http*}" ] && cnt=$(( cnt + 1 )) && continue
+#echo "bad @$cnt: '$url'" 
+done
+len=`expr length $cnt`
+log found $cnt URLs at $u
+#&& return -10
+[ "$cnt" -eq "0" ] && [ "$u" != "--" ] && echo "#$(date):" >> test.err && echo rip '"'$u'"' "$@">> test.err 
+[ "$cnt" -eq "0" ] && [ "$u" == "--" ] && echo "#$(date):" >> test.err && echo "echo '$urls' | rip --" >> test.err 
+for url in $urls
+do
+if [ -n "$url" ] && [ -z "${url%%http*}" ]
+then
+	[ -z "$cmd" ] && local cmd2=`expr "${url//-/_}" : "[^a-zA-Z0-9]*http://\([_a-z0-9A-Z]*\)\.[a-zA-Z]*/" || expr "${url//-/_}" : "[^a-zA-Z0-9]*https://\([_a-z0-9A-Z]*\)\.[a-zA-Z]*/" ||\ 
+                    expr "${url//-/_}" : "[^a-zA-Z0-9]*https?://[a-zA-Z0-9.]*\.\([a-z0-9A-Z_]*\)\.[a-zA-Z]*/" || expr "${url//-/_}" : "[^a-zA-Z0-9]*https://[a-zA-Z0-9.]*\.\([a-z0-9A-Z_]*\)\.[a-zA-Z]*/"`
+        [ -z "$cmd" ] && cmd2=${cmd2:-echo}
+	pos=$(( pos + 1 ))
+	#printf "%0${len}d/%0${len}d\t" $pos $cnt
+	pp=`printf "%0${len}d" $pos`
+	echo -ne "\033[H"
+	echo $pp of $cnt @$title cmd=${cmd2:-$cmd} 
+	echo -ne "\033[s"
+	[ "$pos" -gt 1 ] && [ -z "$nonstop" ] && echo -n "[ sleep 1 sec ]"; sleep 1
+	${cmd:-$cmd2} $url "$@" && success=$(( success + 1 )) || { log "err=$?;cmd=$cmd;url=$url;with=$@"; failed=$((failed + 1)); }
+fi
+done
+[ -n "$failed" ] && [ "$failed" -gt 0 ] && { log Failed $failed of $cnt from $title | tee test.fails; echo "#$(date):" >> test.err; echo collect '"'"$title"'"' >> test.err; }
+[ "$cnt" -gt 1 ] && [ "$success" -gt 0 ] && [ -n "$stitle" ] && collect "$title" || log error packing $u
+[ "$cnt" -gt 1 ] && [ "$success" -gt 0 ] && [ "$failed" -eq 0 ] && log "Success $success of $cnt from $title" && echo "-- $title" >> test.done
+[ "$success" -gt 0 ] || { log No success with $title; mold; }
+unset failed
+}
+
+rrip () {
+local rename=1
+rip "$@"
+}
+
+rrrip() {
+local nonstop=1
+rrip "$@"
+}
+
+trip () {
+
+echo rename: ${rename:-do not rename}
+echo nonstop:${nonstop:-do pauses}
+echo resume: ${resume:-do not resume and archive via mold}
+}
+
+mold() {
+[ -n "$(ls *.jpg 2> /dev/null)" ] || return 2
+old=${1:-img `date`}
+[ -d "$old" ] && old="$old $(date)"
+mkdir "$old" && mv *.jpg "$old/"
+}
+
+tren() {
+[ -z "$rename" ] && export rename="On" || unset rename
+echo Renumbering is now ${rename:-Off}
+}
+
+[ -z "$rename" ] && tren && df -h | grep '/sd'
+
+tstop() {
+[ -z "$nonstop" ] && export nonstop="On" || unset nonstop
+echo Non-stop operation is now ${nonstop:-Off}
+}
+
+tres() {
+[ -z "$resume" ] && export resume="On" || unset resume
+echo Resuming is now ${resume:-Off}
+}
+
+cfix () {
+local cook
+#cook=`sed -ne 's/.*	\([^ 	]*\)	\([^ 	]*\)/\1=\2; /' -e '/;/ H' -e'$ x' -e '$ s/\n//g' -e'$ s/; $// p' .jar; echo $cook
+cook=`sed -nf .sed .jar`
+echo $cook
+#opera ${cook:+-b "$cook"} -D .heads -c .jar -o .out1 "$1" 
+opera -v -D .heads -b .jar -c .jar -o .out1 "$1" 2> .err
+ref=`sed -ne '/Refresh:/ s/[^ -~]//gp' .heads`
+#echo $ref
+[ "" = "$ref" ] && cat .out1 && return 1
+url=${1#*://}
+url=${1%//*}//${url%%/*}${ref#*URL=}
+echo going "_${url}_"
+time=${ref%;*};time=${time#*: };echo sleep $time; sleep $time
+opera -v -D .h2 -b .jar -c .jar -L -o .out2 "$url" 2>> .err
+opera -b .jar -L "$1"
+}
+
+cfa () {
+local cook
+#cook=`sed -ne 's/.*	\([^ 	]*\)	\([^ 	]*\)/\1=\2; /' -e '/;/ H' -e'$ x' -e '$ s/\n//g' -e'$ s/; $// p' .jar; echo $cook
+cook=`sed -nf .sed .jar`
+echo $cook
+#opera ${cook:+-b "$cook"} -D .heads -c .jar -o .out1 "$1" 
+opera -v -L -D .heads -b .jar -c .jar -o .out1 "$@" 2> .err
+grep failed .err && return -1
+cat .err
+ref=`sed -ne '/Refresh:/ s/[^ -~]//gp' .heads`
+#echo $ref
+[ "" = "$ref" ] && cat .out1 && return 1
+url=${1#*://}
+url=${1%//*}//${url%%/*}${ref#*URL=}
+echo going "_${url}_"
+time=${ref%;*};time=${time#*: };echo sleep $time; sleep $time
+opera -v -D .h2 -b .jar -c .jar -L -o .out2 "$url" 2>> .err
+opera -b .jar -L "$@"
+}
+cfb ()
+{
+local loc
+opera -v -D .heads -b .jar -c .jar -e "$1" -o .out1 "$@" 2> .err
+loc=`sed -ne '/Location:/ s/[^ -~]//gp' .heads`
+[ -n "$loc" ] || return 0
+url=${1#*://}
+url=${1%//*}//${url%%/*}${loc#*: }
+echo going "_${url}_"
+opera -v -D .heads -b .jar -c .jar -e "$1" "$url" -o .out2 2>> .err
+loc=`sed -ne '/Location:/ s/[^ -~]//gp' .heads`
+[ -n "$loc" ] || return 0
+ur1=${1#*://}
+ur1=${1%//*}//${ur1%%/*}${loc#*: }
+echo going "_${ur1}_"
+opera -v -D .heads -b .jar -c .jar -e "$url" "$ur1" -o .out3 2>> .err
+
+}
+
+
+
+
+

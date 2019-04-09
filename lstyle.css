@@ -1,0 +1,114 @@
+.unfinished {
+	color=crimson;
+}
+.url:hover, .url:hover a {
+	color:orange;
+	text-decoration: underline overline;
+}
+table.unfinished {
+	background-color:lightgoldenrodyellow;
+}
+.torr a, .skipped a {
+	text-decoration: none !important;
+	color: slategray !important;
+}
+.done a {
+	text-decoration: line-through !important;
+	color: darkgreen !important;
+}
+
+.done {
+    text-decoration: line-through !important;
+    background-image: linear-gradient(to bottom, #8d8 0%, #afa 100%) !important;
+}
+
+.done.btn, button.done {
+    border: 1px outset #8d8;
+    border-radius: 4px;
+}
+
+.broken a {
+	text-decoration: line-through wavy red;
+	color: black;
+}
+table {
+	#border-color: gray;
+	#border-width: 1px;
+	#border-style: inset;
+	border-collapse: collapse;
+	#cell-padding: 0px;
+	#cell-spacing: 1px;
+}
+table.block {
+	width: 100%;
+	border: 0px outset gray;
+}
+table.block .url, table.block .bend {
+    display: none;
+}
+table.block.unfinished{
+    display:table;
+}
+table.block.unfinished tr {
+    display: table-row;
+}
+:focus tr td,:hover tr td, table.block.unfinished tr td{
+    display: table-cell;
+}
+td.bend {
+	text-align: right;
+}
+.name {
+	text-align: center;
+	font-weight: bold;
+	text-shadow: 1px 1px white;
+	background-color: #ccc;
+	color: darksteelblue;
+	border: 1px #ccc outset;
+}
+.unfinished .name, .name:hover {
+	text-align: center;
+	font-weight: bold;
+	text-shadow: 1px 1px white;
+	background-color: lightsteelblue;
+	color: darksteelblue;
+	border: 1px lightsteelblue outset;
+}
+table.block tr, table.block td {
+	#border: 2px outset gray;
+}
+table.block tr:nth-child(even) {
+	background-color: #f2f2f280;
+}
+table.block tr:hover {background-color: #f5f5f5;}
+
+body > table tr:nth-child(even) {
+	background-color: #wheat;
+}
+
+.progress {
+	height:.8em;
+	border:1px solid steelblue; 
+	display:inline-block;
+	width:300px; 
+	background-color:steelblue; 
+	vertical-align:baseline;
+	float:left;
+}
+.fill {
+	background-color: white;
+	height:100%; 
+	display: inline-block;
+}
+
+.trial{
+    text-shadow: 0px 0px 2px goldenrod;
+}
+.good {
+    text-shadow: 0px 0px 2px green;
+}
+.black {
+    //text-shadow: 0px 0px 2px goldenrod;
+    text-decoration: line-through;
+}
+
