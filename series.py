@@ -1,4 +1,5 @@
-﻿import os
+#!/usr/bin/python
+import os
 import sys
 import re
 from collections import defaultdict
@@ -8,8 +9,8 @@ dest = r'N:\Unsorted\sorted'
 source = r'\\dkvm\vgoissa\rtorrent\download\HS'
 
 source = r'Z:\HS'
-source = len(sys.argv)>1 and sys.argv[1] or '.'
-dest = len(sys.argv)>2 and sys.argv[2] or '-'
+source = len(sys.argv)>1 and sys.argv[1] or '.' # get src path from CLI or work in local dir
+dest = len(sys.argv)>2 and sys.argv[2] or '-'   # get dest path from CLI or do noting
 
 #print source, dest
 #quit()
@@ -25,7 +26,7 @@ series = defaultdict(lambda : [])
 #     if os.path.isdir(dest + '\\' + dname):
 #         groups.add(dname)
 # print groups
-seriesfilter = re.compile(r'^\[([^]]+)\] ([^[\]]+) - ([0-9][0-9v\.]*).*\.(\w+)$')
+seriesfilter = re.compile(r'^\[([^]]+)\] ([^[\]]+) - ([0-9][0-9v\.]*[0-9])( \[[^\]]+\])?\.(\w+)$')
 for rname, rematch in [(fname, seriesfilter.match(fname)) for fname in os.listdir(source)]:
     if rematch:
         serie = rematch.group(2)
