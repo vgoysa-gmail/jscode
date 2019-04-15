@@ -43,7 +43,13 @@ function makeBtn(n,oncl,hr){
   b.className="badge";
   return b;
 }
-const Cookie = {
+function makeToolTip(parent,text) {
+  let b=makeText("div",text);
+  b.className="vgtooltiptext ontop";
+  parent.classList.add("vgtooltip")
+  parent.appendChild(b);
+}
+Cookie = {
   get: name => {
       let c = document.cookie.match(`(?:(?:^|.*; *)${name} *= *([^;]*).*$)|^.*$`)[1]
       if (c) return decodeURIComponent(c)
@@ -65,7 +71,7 @@ const Cookie = {
   , getList: name => JSON.parse(Cookie.get(name)||"[]")
   , setJSON: (name, value, opts) => Cookie.set(name, JSON.stringify(value), opts)
 }
-prep = (name) => name.replace(/[^a-zA-Z0-9]/g,"");
+prep = name => name.replace(/[^a-zA-Z0-9]/g,"");
 function record_click(evt) {
   if (this.hasAttribute("episodet")) {
     // alert(this.episodet+this.episoden);
@@ -82,6 +88,44 @@ function record_click(evt) {
     }
   }
   // evt.preventDefault();
+}
+function load_file_list(event){
+  event.target.removeEventListener(event.type,load_file_list);
+  let xhr = new XMLHttpRequest();
+  let list_data;
+  let anchor = event.currentTarget;
+  let show = anchor.episodet;
+  xhr.withCredentials = true;
+  xhr.open("GET", encodeURI("https://dkvm/api/shows/search?query="+show));
+  xhr.responseType = 'json';
+  // alert("1");
+  //xhr.setRequestHeader("Content-Type", "application/json");
+  console.log(event,`adding tooltip for ${show}`);
+  div=makeTag("div");
+  div.className="vgtooltiptext ontop";
+  div.innerHTML=`<p class='tipName'>${anchor.episodet}</p>\n`;
+  anchor.classList.add("vgtooltip");
+  anchor.appendChild(div);
+  xhr.div = div;
+  xhr.addEventListener("readystatechange", function() {
+    if (this.readyState == 4) {
+      console.log(this.response);
+      if (this.response && this.response.episodes) { // "episodes" in
+        for (name in this.response.episodes){
+          console.log(`<strong>${name}</strong>${this.response.episodes[name].join()}<br>\n`);
+          this.div.innerHTML+=`<p class="tipItem">${name} ${collapse(this.response.episodes[name])}</p>\n`;
+        }
+      }
+    }
+    //anchor.addEventListener(event.type,load_file_list);
+  });
+  try {
+    xhr.send();
+  }
+  catch (e) {
+    console.log(e);
+  }
+
 }
 function load_list_async(listName) {
     let xhr = new XMLHttpRequest();
@@ -211,24 +255,26 @@ function btnclick(event) {
 }
 function hs_load(evt) {
   console.log(evt);
+  loadCSS();
   let d = document;
   let s = d.querySelectorAll(".hs-magnet-link > a");
   if (s.length > 0) {
     // specific show page
     a = "";
     floodLogin();
-    for (i = 0; i < s.length; i++) {
+    for (i = 0; i < s.length; i++) { // magnet links // single show page
       if (s[i].href.search("tracker.opentrackr.org") > 0) {
         s[i].href = s[i].href.replace(/&tr=.*/, "&tr=http://nyaa.tracker.wf:7777/announce&tr=udp://tracker.tiny-vps.com:6969/announce&tr=http://t.nyaatracker.com:80/announce");
       }
       if (s[i].href.search("magnet:") == 0) {
         s[i].addEventListener("click", btnclick);
+        s[i].classList.add("good");
       }
     }
   } else {
     // show list page
     let btn = d.querySelector(".latest-show-more");
-    if (btn && !btn.hasAttribute("parsed")) {
+    if (btn && !btn.hasAttribute("parsed")) { // more button
       btn.setAttribute("parsed", true);
       btn.classList.add("good");
       // btn.addEventListener("change",hs_load);
@@ -236,7 +282,7 @@ function hs_load(evt) {
     }
     let s = d.querySelectorAll(".latest-releases > ul > li > a");
     // console.log(s);
-    for (let p of s) {
+    for (let p of s) { // title page list
       lookup_show(p);
     }
     if (!showList) {
@@ -276,11 +322,19 @@ function lookup_show(p) {
       }
     }
     // console.log(episode);
+    // p.addEventListener("mousedown",load_file_list,false);
+    // p.addEventListener("focus",load_file_list,false);
+    // p.addEventListener("mouseover",load_file_list,false);
+    p.addEventListener("mouseenter",load_file_list);
+
     done = Cookie.getList(prep(episode.name));
-    // console.log(done);
-    if (done.includes(episode.number)) {
-      p.classList.add("done");
+    if (done && done.length) {
+      //makeToolTip(p,done.join());
+      if (done.includes(episode.number)) {
+        p.classList.add("done");
+      }
     }
+    // console.log(done);
     p.setAttribute("episodet",episode.name);
     p.setAttribute("episoden",episode.number);
     p.episodet=episode.name;
@@ -291,6 +345,7 @@ function lookup_show(p) {
       p.classList.add(triage[episode.name]);
     } else if (!p.hasAttribute("undecided")) {
       p.setAttribute("undecided",true);
+      p.classList.add("other");
       p.undecided = true;
       ["-","?","+"].forEach(
         (x)=>p.appendChild(makeBtn(x,record,episode.name))
@@ -298,6 +353,16 @@ function lookup_show(p) {
     }
   }
 
+}
+function loadCSS() {
+  if (!document.querySelector("link[href='https://dkvm/js/lstyle.css']")) {
+    //getElementById("csslstyle")) {
+    link=makeTag("LINK");
+    link.rel  = "stylesheet";
+    link.href = "https://dkvm/js/lstyle.css";
+    link.id   = "csslstyle";
+    document.head.appendChild(link);
+  }
 }
 function floodLogin() {
   let data = {
@@ -317,8 +382,9 @@ function floodLogin() {
   xhr.open("POST", "https://dkvm:3000/auth/authenticate");
   xhr.setRequestHeader("Content-Type", "application/json");
   xhr.setRequestHeader("cache-control", "no-cache");
+  //xhr.responseType = 'json';
 
-  xhr.send(data);
+  xhr.send(JSON.stringify(data));
 }
 
 update_lists();
@@ -327,7 +393,64 @@ var observer = new MutationObserver(wait_shows);
 var showList = document.querySelector(".latest-releases");
 if (showList) {observer.observe(showList, config);}
 window.addEventListener("DOMContentLoaded", hs_load, false);
+window.addEventListener("load", hs_load, false);
 
+if (document.documentURI.search("horriblesubs.info")) {
+  hs_load({
+  src:"init",
+  href:document.documentURI,
+  dom:document.domain});
+}
+
+function collapse(l) {
+  let minep = 0;
+  let maxep = 0;
+  let smin = "";
+  let smax = "";
+  let ix = 0;
+  let lst = [];
+  let numre = /^[0-9v\.]+$/
+  console.log(l);
+  for (let x of l) {
+    console.log(x);
+    ix = parseFloat(x);
+    if (x.match(numre)&&ix) {
+      if (smin) { //not a first item
+        if (maxep+1>=ix&&ix>=maxep) {
+          smax = x;
+          maxep = ix;
+        } else if (minep-1<=ix&&ix<=minep) {
+          smin = x;
+          minep = ix;
+        } else {
+          lst.push(`${smin}${(minep==maxep)?"":"-"+smax}`);
+          smin = x;
+          minep = ix;
+          smax = x;
+          maxep = ix;
+        }
+      } else { // first in list
+        smin = x;
+        minep = ix;
+        smax = x;
+        maxep = ix;
+      }
+    } else { // not a number
+      if (smin) {
+        lst.push(`${smin}${(minep==maxep)?"":"-"+smax}`);
+      }
+      lst.push(x);
+      smin = "";
+      minep = 0;
+      smax = "";
+      maxep = 0;
+    }
+  }
+  if (smin) {
+    lst.push(`${smin}${(minep==maxep)?"":"-"+smax}`);
+  }
+  return lst.join();
+}
 /*
 var targetNode = document.getElementById('some-id');
 
