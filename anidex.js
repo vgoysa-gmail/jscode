@@ -1,7 +1,7 @@
 ﻿function btnclick(event)
 {
   if (this.href) {   // confirm("Click on magnet")
-    var data = JSON.stringify({
+    let data = JSON.stringify({
       "urls": [
         this.href
       ],
@@ -13,14 +13,14 @@
       ]
     });
 
-    var cl=this.classList;
-    var xhr = new XMLHttpRequest();
+    let cl=this.classList;
+    let xhr = new XMLHttpRequest();
     xhr.withCredentials = true;
 
     xhr.addEventListener("readystatechange", function () {
       if (this.readyState === 4) {
         console.log(this.responseText);
-        cl.add("done")
+        cl.add("done");
       }
     });
 
@@ -32,36 +32,55 @@
   }
   event.preventDefault();
 }
-
-window.addEventListener("load",function(){
-    var d=document;
-    var s=d.querySelectorAll("A.btn");
-    function add(b,h){return b.insertAdjacentElement("afterend", h);}
-    function makeTag(t){return document.createElement(t);}
-    function makeBtn(n,oncl,hr){var b=makeText("button",n);
-                b.addEventListener("click",oncl);
-                b.href=hr;
-                b.className="btn btn-default";
-                return b;
-    }
-    function makeText(tag,text){
-      var tt=makeTag(tag);
-      tt.appendChild(d.createTextNode(text));
-      return tt;
-    }
+makeTag = t => document.createElement(t);
+function makeBtn(n,oncl,hr){
+  let b=makeText("button",n);
+  b.addEventListener("click",oncl);
+  b.href=hr;
+  b.className="btn btn-default";
+  return b;
+}
+function makeText(tag,text){
+  let tt=makeTag(tag);
+  tt.appendChild(document.createTextNode(text));
+  return tt;
+}
+function loadCSS() {
+  if (!document.querySelector("link[href='https://dkvm/js/lstyle.css']")) {
+    //getElementById("csslstyle")) {
+    link=makeTag("LINK");
+    link.rel  = "stylesheet";
+    link.href = "https://dkvm/js/lstyle.css";
+    link.id   = "csslstyle";
+    document.head.appendChild(link);
+  }
+}
+function ani_load(evt){
+    let s=document.querySelectorAll("A.btn");
+    loadCSS();
     floodLogin();
     if(s.length>0){
-        a="";
-        for(i=0;i<s.length;i++){
+        // let a="";
+        for(let i=0;i<s.length;i++){
             if(s[i].href.search("magnet:")==0) {
-                add(s[i],makeBtn("game",btnclick,s[i].href));
-                add(s[i],makeBtn("anime",btnclick,s[i].href));
-                add(s[i],makeBtn("Manga",btnclick,s[i].href));
-                //s[i].addEventListener("click",magnetclick,true); // function(e){magnetclick(e,this)}
+                s[i].insertAdjacentElement("afterend",
+                  makeBtn("game",btnclick,s[i].href));
+                s[i].insertAdjacentElement("afterend",
+                  makeBtn("anime",btnclick,s[i].href));
+                s[i].insertAdjacentElement("afterend",
+                  makeBtn("Manga",btnclick,s[i].href));
+                s[i].classList.add("good");
             }
         }
     }
-}, false);
+}
+window.addEventListener("load", ani_load, false);
+if (document.documentURI.search("anidex.info")) {
+  ani_load({
+    src:"init",
+    href:document.documentURI,
+    dom:document.domain});
+}
 function floodLogin()
 {
     var data = JSON.stringify({
